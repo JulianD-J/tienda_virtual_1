@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Colediverti - PayCenter Futurista</title>
+<style>
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: radial-gradient(circle at top, #000428, #004e92);
+    margin: 0; padding: 0;
+    display: flex; justify-content: center; align-items: center;
+    height: 100vh; color: #fff;
+  }
+  .payment-container {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 30px; border-radius: 15px;
+    box-shadow: 0 0 25px rgba(0, 229, 255, 0.5);
+    backdrop-filter: blur(15px);
+    animation: fadeIn 1s ease-in-out;
+    display: flex; flex-direction: row;
+    align-items: flex-start; gap: 40px;
+  }
+  @keyframes fadeIn { from {opacity:0; transform: translateY(-20px);} to {opacity:1; transform: translateY(0);} }
+  h2 { color: #00e5ff; text-shadow: 0 0 10px #00e5ff; }
+  .card-preview {
+    background: linear-gradient(135deg, #00e5ff, #0072ff);
+    color: white; border-radius: 12px; padding: 20px;
+    font-family: 'Courier New', monospace;
+    box-shadow: 0 0 15px rgba(0, 229, 255, 0.7);
+  }
+  form { flex: 1; min-width: 280px; }
+  label { display: block; margin-top: 8px; font-weight: bold; color: #a0f8ff; }
+  input, select {
+    width: 100%; padding: 10px; margin-top: 5px;
+    border-radius: 8px; border: none; outline: none;
+    background: rgba(255,255,255,0.1); color: white;
+  }
+  .pay-btn {
+    background: linear-gradient(90deg, #00e5ff, #0072ff);
+    border: none; color: white; padding: 12px;
+    width: 100%; border-radius: 8px; cursor: pointer;
+    font-size: 1.1em; margin-top: 15px;
+    box-shadow: 0 0 10px rgba(0,229,255,0.7);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .pay-btn:hover { transform: scale(1.05); box-shadow: 0 0 20px rgba(0,229,255,1); }
+  .success { display:none; text-align:center; color:#00e5ff; font-weight:bold; margin-top:20px; font-size:1.1em; text-shadow:0 0 8px #00e5ff; }
+  .summary { background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; margin-top: 15px; }
+
+  /* Animación de escaneo */
+  .scanner {
+    width: 100%; height: 120px; position: relative;
+    background: rgba(0,0,0,0.6);
+    border: 2px solid #00e5ff; border-radius: 10px;
+    margin-top: 15px; display: none; overflow: hidden;
+  }
+  .laser {
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 4px;
+    background: linear-gradient(90deg, transparent, #00e5ff, transparent);
+    box-shadow: 0 0 12px #00e5ff;
+    animation: scan 2s linear infinite;
+  }
+  @keyframes scan {
+    0% { top: 0; }
+    100% { top: 100%; }
+  }
+
+  /* Factura digital animada */
+  .invoice {
+    display: none;
+    background: rgba(0,0,0,0.85);
+    border: 2px solid #00e5ff;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 0 20px #00e5ff;
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    animation: slideUp 0.8s ease forwards;
+    z-index: 1000;
+  }
+  @keyframes slideUp {
+    from { transform: translate(-50%, 100%); opacity: 0; }
+    to { transform: translate(-50%, -50%); opacity: 1; }
+  }
+  .invoice h3 { margin: 0; color: #00e5ff; text-align: center; }
+  .invoice p { margin: 5px 0; color: #fff; }
+</style>
+</head>
+<body>
+<div class="payment-container">
+  <div>
+    <h2>🚀 PayCenter Colediverti</h2>
+    <div class="card-preview">
+      <strong>Colediverti NeoCard</strong><br>
+      5999 8888 7777 1111<br>
+      12/30 - CVV: 123
+    </div>
+    <button type="button" class="pay-btn" onclick="iniciarEscaneo()">📦 Ver Resumen</button>
+    <div id="scanner" class="scanner"><div class="laser"></div></div>
+    <div id="order-summary" class="summary" style="display:none;"></div>
+  </div>
+  <form id="payment-form" style="display:none;">
+    <label>Nombre en la tarjeta</label>
+    <input type="text" required>
+    <label>Número de tarjeta</label>
+    <input type="text" value="5999 8888 7777 1111" required>
+    <label>Fecha de expiración</label>
+    <input type="text" value="12/30" required>
+    <label>CVV</label>
+    <input type="text" value="123" required>
+    <label>Correo electrónico</label>
+    <input type="email" placeholder="ejemplo@correo.com" required>
+    <label>Dirección de envío</label>
+    <input type="text" placeholder="Calle 123, Ciudad" required>
+    <label>Método de pago</label>
+    <select required>
+      <option>Tarjeta de crédito</option>
+      <option>Tarjeta de débito</option>
+      <option>PayPal</option>
+      <option>Transferencia bancaria</option>
+    </select>
+    <button type="submit" class="pay-btn">💳 Pagar ahora</button>
+    <div class="success">✅ Pago realizado con éxito - ¡Gracias por tu compra!</div>
+  </form>
+</div>
+
+<!-- Factura digital animada -->
+<div id="invoice" class="invoice"></div>
+
+<!-- Archivos de sonido -->
+<audio id="scan-sound" src="sounds/scan.mp3"></audio>
+<audio id="summary-sound" src="sounds/summary.mp3"></audio>
+<audio id="success-sound" src="sounds/success.mp3"></audio>
+
+<script>
+  let resumenMostrado = false;
+
+  function iniciarEscaneo(){
+    if(resumenMostrado){ 
+      alert("El resumen ya fue generado y no se puede modificar.");
+      return;
+    }
+    let codigoCarrito = localStorage.getItem('cartCode');
+    if(!codigoCarrito){ 
+      alert("No hay pedido guardado 😢"); 
+      return; 
+    }
+
+    // Reproduce sonido de escaneo
+    document.getElementById('scan-sound').play();
+
+    const scanner = document.getElementById("scanner");
+    scanner.style.display = "block";
+
+    setTimeout(() => {
+      scanner.style.display = "none";
+      mostrarResumen(codigoCarrito);
+    }, 2500);
+  }
+
+  function mostrarResumen(codigoCarrito){
+    let total = 0;
+    let productos = [];
+    const precios = {1:199900, 2:249900, 3:5499900, 4:6999900, 5:1499900, 6:1799900, 7:4999900, 8:2999900};
+    const nombres = {1:"Xiaomi Smart Band 9", 2:"Xiaomi Smart Band 9 Pro", 3:"Samsung Galaxy S25", 4:"Samsung Galaxy S25 Ultra", 5:"Asus ROG", 6:"Google Pixel 10 Pro", 7:"Asus ROG", 8:"Colediverti Computer 5"};
+
+    codigoCarrito.split('+').forEach(id=>{
+      if(precios[id]){
+        total += precios[id];
+        productos.push(nombres[id] + " - $" + precios[id].toLocaleString('es-CO') + " COP");
+      }
+    });
+
+    document.getElementById('order-summary').innerHTML = "<strong>Productos:</strong><br>"+productos.join('<br>')+"<br><br><strong>Total:</strong> $"+total.toLocaleString('es-CO')+" COP";
+    document.getElementById('order-summary').style.display = 'block';
+    document.getElementById('payment-form').style.display = 'block';
+
+    // Reproduce sonido al mostrar resumen
+    document.getElementById('summary-sound').play();
+
+    resumenMostrado = true;
+    localStorage.removeItem('cartCode');
+    localStorage.removeItem('cartTotal');
+  }
+
+  document.getElementById('payment-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    document.querySelector('.success').style.display = 'block';
+
+    // Reproduce sonido de éxito
+    document.getElementById('success-sound').play();
+
+    // Mostrar factura animada
+    const invoice = document.getElementById('invoice');
+    invoice.innerHTML = `
+      <h3>🧾 Factura Digital Colediverti</h3>
+      <p><strong>Cliente:</strong> ${document.querySelector('input[type=text]').value}</p>
+      <p><strong>Email:</strong> ${document.querySelector('input[type=email]').value}</p>
+      <p><strong>Total Pagado:</strong> ${document.getElementById('order-summary').innerText.split("Total:")[1]}</p>
+      <p><em>Gracias por comprar en Colediverti 3000 🚀</em></p>
+    `;
+    invoice.style.display = 'block';
+  });
+</script>
+</body>
+</html>
+
