@@ -102,19 +102,19 @@
   </div>
   <form id="payment-form" style="display:none;">
     <label>Nombre en la tarjeta</label>
-    <input type="text" required>
+    <input id="card-name" name="cardName" type="text" required>
     <label>Número de tarjeta</label>
-    <input type="text" value="5999 8888 7777 1111" required>
+    <input id="card-number" name="cardNumber" type="text" value="5999 8888 7777 1111" required>
     <label>Fecha de expiración</label>
-    <input type="text" value="12/30" required>
+    <input id="card-exp" name="cardExp" type="text" value="12/30" required>
     <label>CVV</label>
-    <input type="text" value="123" required>
+    <input id="card-cvv" name="cardCvv" type="text" value="123" required>
     <label>Correo electrónico</label>
-    <input type="email" placeholder="ejemplo@correo.com" required>
+    <input id="email" name="email" type="email" placeholder="ejemplo@correo.com" required>
     <label>Dirección de envío</label>
-    <input type="text" placeholder="Calle 123, Ciudad" required>
+    <input id="address" name="address" type="text" placeholder="Calle 123, Ciudad" required>
     <label>Método de pago</label>
-    <select required>
+    <select id="method" name="method" required>
       <option>Tarjeta de crédito</option>
       <option>Tarjeta de débito</option>
       <option>PayPal</option>
@@ -134,21 +134,26 @@
 <audio id="success-sound" src="sounds/success.mp3"></audio>
 
 <script>
+  // Variables globales temporales para transmitir a TurboWarp
+  window.lastOrderItems = [];
+  window.lastOrderTotal = 0;
+
   let resumenMostrado = false;
 
   function iniciarEscaneo(){
-    if(resumenMostrado){ 
+    if(resumenMostrado){
       alert("El resumen ya fue generado y no se puede modificar.");
       return;
     }
     let codigoCarrito = localStorage.getItem('cartCode');
-    if(!codigoCarrito){ 
-      alert("No hay pedido guardado 😢"); 
-      return; 
+    if(!codigoCarrito){
+      alert("No hay pedido guardado 😢");
+      return;
     }
 
     // Reproduce sonido de escaneo
-    document.getElementById('scan-sound').play();
+    const scanSound = document.getElementById('scan-sound');
+    if(scanSound) scanSound.play();
 
     const scanner = document.getElementById("scanner");
     scanner.style.display = "block";
@@ -165,44 +170,103 @@
     const precios = {1:199900, 2:249900, 3:5499900, 4:6999900, 5:1499900, 6:1799900, 7:4999900, 8:2999900};
     const nombres = {1:"FitBand Neo", 2:"FitBand Neo Max", 3:"FitBand Ultra 10", 4:"SuperNova S25", 5:"SuperNova S25 Ultra", 6:"Colediverti X Pro", 7:"Sox Pro Max", 8:"Colediverti Core Max"};
 
-    codigoCarrito.split('+').forEach(id=>{
+    // Construir items como array de objetos para enviar luego
+    const itemsData = [];
+    codigoCarrito.split('+').forEach(id => {
       if(precios[id]){
         total += precios[id];
         productos.push(nombres[id] + " - $" + precios[id].toLocaleString('es-CO') + " COP");
+        itemsData.push({
+          id: id,
+          name: nombres[id],
+          price: precios[id]
+        });
       }
     });
 
-    document.getElementById('order-summary').innerHTML = "<strong>Productos:</strong><br>"+productos.join('<br>')+"<br><br><strong>Total:</strong> $"+total.toLocaleString('es-CO')+" COP";
+    // Guardar globalmente para usar en el submit
+    window.lastOrderItems = itemsData;
+    window.lastOrderTotal = total;
+
+    document.getElementById('order-summary').innerHTML = "<strong>Productos:</strong><br>" + productos.join('<br>') + "<br><br><strong>Total:</strong> $" + total.toLocaleString('es-CO') + " COP";
     document.getElementById('order-summary').style.display = 'block';
     document.getElementById('payment-form').style.display = 'block';
 
     // Reproduce sonido al mostrar resumen
-    document.getElementById('summary-sound').play();
+    const summarySound = document.getElementById('summary-sound');
+    if(summarySound) summarySound.play();
 
     resumenMostrado = true;
+    // opcional: para evitar re-uso puedes borrar cartCode ahora
     localStorage.removeItem('cartCode');
     localStorage.removeItem('cartTotal');
   }
+
+  // Escuchar mensajes del padre (por ejemplo ack)
+  window.addEventListener('message', function(event){
+    // Si quieres limitar orígenes, reemplaza '*' en los postMessage por el origen seguro
+    // y descomenta la siguiente linea:
+    // if(event.origin !== 'https://tudominio.tld') return;
+    const msg = event.data || {};
+    if(msg.type === 'order_ack'){
+      console.log('Padre ACK:', msg);
+      // puedes mostrar notificación o actualizar UI
+    }
+  });
 
   document.getElementById('payment-form').addEventListener('submit', function(e) {
     e.preventDefault();
     document.querySelector('.success').style.display = 'block';
 
     // Reproduce sonido de éxito
-    document.getElementById('success-sound').play();
+    const successSound = document.getElementById('success-sound');
+    if(successSound) successSound.play();
+
+    // Datos del comprador
+    const buyerName = document.getElementById('card-name').value || 'Anonimo';
+    const email = document.getElementById('email').value || '';
+    const address = document.getElementById('address').value || '';
+
+    // Generar order id
+    const orderId = 'orden_' + Date.now() + '_' + Math.floor(Math.random() * 900 + 100);
+
+    // Estructura a enviar por postMessage
+    const payload = {
+      type: 'order_completed',   // tipo de mensaje que el TurboWarp debe manejar
+      exit_code: 0,              // 0 = éxito, otros = errores segun tu convención
+      order_id: orderId,
+      items: window.lastOrderItems,  // array de {id, name, price}
+      total: window.lastOrderTotal,
+      buyer_name: buyerName,
+      email: email,
+      address: address,
+      timestamp: Date.now()
+    };
+
+    // Enviar a la app padre (TurboWarp). Reemplaza '*' por el origen real al pasar a producción.
+    try {
+      if(window.parent && window.parent !== window){
+        window.parent.postMessage(payload, '*');
+        console.log('Mensaje enviado al padre:', payload);
+      } else {
+        console.warn('No hay window.parent o la página no está embebida; payload: ', payload);
+      }
+    } catch(err) {
+      console.error('Error enviando postMessage:', err);
+    }
 
     // Mostrar factura animada
     const invoice = document.getElementById('invoice');
     invoice.innerHTML = `
       <h3>🧾 Factura Digital Colediverti</h3>
-      <p><strong>Cliente:</strong> ${document.querySelector('input[type=text]').value}</p>
-      <p><strong>Email:</strong> ${document.querySelector('input[type=email]').value}</p>
-      <p><strong>Total Pagado:</strong> ${document.getElementById('order-summary').innerText.split("Total:")[1]}</p>
+      <p><strong>Cliente:</strong> ${buyerName}</p>
+      <p><strong>Email:</strong> ${email}</p>
+      <p><strong>Total Pagado:</strong> $${window.lastOrderTotal.toLocaleString('es-CO')} COP</p>
       <p><em>Gracias por comprar en Colediverti 3000 🚀</em></p>
+      <p style="font-size:0.9em;color:#9fe9ff;margin-top:8px;">ID orden: ${orderId}</p>
     `;
     invoice.style.display = 'block';
   });
 </script>
 </body>
 </html>
-
